@@ -76,8 +76,12 @@
         
             pc.addTransceiver('video', { direction: 'recvonly' });
         
-            // FIX: Using string joining ensures NGROK_HOST parses exactly right
-            ws = new WebSocket("wss://" + NGROK_HOST + "/");
+            // Replace your old ws = new WebSocket(...) line with this exact logic:
+            const protocol = "wss://";
+            const urlParams = "?ngrok-skip-browser-warning=true";
+            
+            ws = new WebSocket(protocol + NGROK_HOST + "/" + urlParams);
+
         
             ws.onopen = async () => {
                 console.log("Connected to Jetson signaling system. Negotiating stream channel...");
