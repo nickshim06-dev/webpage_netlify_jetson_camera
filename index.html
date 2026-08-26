@@ -32,10 +32,10 @@
             margin-top: 15px;
             aspect-ratio: 16 / 9;
         }
-        iframe, video {
+        video {
             width: 100%;
             height: 100%;
-            border: none;
+            object-fit: contain;
         }
         .badge {
             background-color: #cf6679;
@@ -54,10 +54,50 @@
         <p>AI Model: SSD-Mobilenet-v2 (Person Detection)</p>
         
         <div class="video-box">
-            <!-- Replace with your public Ngrok URL pointing to the Jetson's stream webpage -->
-            <iframe src="https://ngrok-free.dev" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+            <!-- Native HTML5 Video Element for WebRTC stream processing -->
+            <video id="jetson-video" autoplay muted playsinline controls></video>
         </div>
     </div>
 
+    <!-- WebRTC Connection Script to link with jetson.utils stream directly -->
+    <script>
+        const videoElement = document.getElementById('jetson-video');
+        
+        // Construct the WebRTC stream URL from your public secure ngrok tunnel
+        // NOTE: We change 'https://' to 'wss://' for secure WebRTC signaling data
+        const ngrokHost = "charbroil-overtime-mothproof.ngrok-free.dev";
+        const streamUrl = `wss://${ngrokHost}/mystream`;
+
+        async function startWebRTC() {
+            const pc = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:://google.com' }]
+            });
+
+            pc.ontrack = (event) => {
+                if (videoElement.srcObject !== event.streams[0]) {
+                    videoElement.srcObject = event.streams[0];
+                }
+            };
+
+            // Setup internal WebSocket signalling with your Jetson's built-in WebRTC server
+            const ws = new WebSocket(streamUrl);
+            ws.onmessage = async (message) => {
+                const data = JSON.parse(message.data);
+                if (data.sdp) {
+                    await pc.setRemoteDescription(new RTCSessionDescription(data));
+                    if (data.type === 'offer') {
+                        const answer = await pc.createAnswer();
+                        await pc.setLocalDescription(answer);
+                        ws.send(JSON.stringify(pc.localDescription));
+                    }
+                } else if (data.candidate) {
+                    await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+                }
+            };
+        }
+
+        // Start the link sequence automatically on page load
+        startWebRTC().catch(console.error);
+    </script>
 </body>
 </html>
