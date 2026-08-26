@@ -54,14 +54,11 @@
         <p>AI Model: SSD-Mobilenet-v2 (Person Detection)</p>
         
         <div class="video-box">
-            <!-- Native HTML5 Video Element for WebRTC stream processing -->
             <video id="jetson-video" autoplay muted playsinline controls></video>
         </div>
     </div>
 
-    <!-- WebRTC Connection Script to link with jetson.utils stream directly -->
     <script>
-        // Configuration matching your running ngrok tunnel configuration exactly
         const NGROK_HOST = "charbroil-overtime-mothproof.ngrok-free.dev";
         const STREAM_NAME = "mystream"; 
         
@@ -70,30 +67,27 @@
         let ws = null;
         
         function startWebRTC() {
-            // 1. Initialize peer connection with standard web tracking servers
             pc = new RTCPeerConnection({});
         
-            // 2. Bind video track handler
             pc.ontrack = (event) => {
                 console.log("Receiving live video tracks from Jetson Nano...");
                 videoElement.srcObject = event.streams[0];
             };
         
-            // Add empty media placeholders to prompt the Jetson framework to push its GPU feed
             pc.addTransceiver('video', { direction: 'recvonly' });
         
-            // 3. Connect to the signaling socket endpoint over secure WebSockets
-            ws = new WebSocket('wss://${NGROK_HOST}/');
+            // FIX: Using string joining ensures NGROK_HOST parses exactly right
+            ws = new WebSocket("wss://" + NGROK_HOST + "/");
         
             ws.onopen = async () => {
                 console.log("Connected to Jetson signaling system. Negotiating stream channel...");
                 const offer = await pc.createOffer();
                 await pc.setLocalDescription(offer);
                 
-                // Send format proposal array directly to the jetson-inference backend container
+                // FIX: Field names matched to NVIDIA's jetson-inference expectation
                 ws.send(JSON.stringify({
-                    cmd: "request",
-                    stream: STREAM_NAME,
+                    command: "request",
+                    stream_id: STREAM_NAME,
                     sdp: pc.localDescription.sdp,
                     type: pc.localDescription.type
                 }));
@@ -117,7 +111,6 @@
             ws.onclose = () => console.log("Signaling socket channel successfully closed.");
         }
         
-        // Kickstart player routine automatically on page load sequence
         window.onload = startWebRTC;
     </script>
 </body>
