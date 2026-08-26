@@ -61,43 +61,66 @@
 
     <!-- WebRTC Connection Script to link with jetson.utils stream directly -->
     <script>
-        const videoElement = document.getElementById('jetson-video');
+        // Configuration matching your running ngrok tunnel configuration exactly
+        const NGROK_HOST = "charbroil-overtime-mothproof.ngrok-free.dev";
+        const STREAM_NAME = "mystream"; 
         
-        // Construct the WebRTC stream URL from your public secure ngrok tunnel
-        // NOTE: We change 'https://' to 'wss://' for secure WebRTC signaling data
-        const ngrokHost = "charbroil-overtime-mothproof.ngrok-free.dev";
-        const streamUrl = `wss://${ngrokHost}/mystream`;
-
-        async function startWebRTC() {
-            const pc = new RTCPeerConnection({
+        const videoElement = document.getElementById('jetson-video');
+        let pc = null;
+        let ws = null;
+        
+        function startWebRTC() {
+            // 1. Initialize peer connection with standard web tracking servers
+            pc = new RTCPeerConnection({
                 iceServers: [{ urls: 'stun:://google.com' }]
             });
-
+        
+            // 2. Bind video track handler
             pc.ontrack = (event) => {
-                if (videoElement.srcObject !== event.streams[0]) {
-                    videoElement.srcObject = event.streams[0];
-                }
+                console.log("Receiving live video tracks from Jetson Nano...");
+                videoElement.srcObject = event.streams[0];
             };
-
-            // Setup internal WebSocket signalling with your Jetson's built-in WebRTC server
-            const ws = new WebSocket(streamUrl);
+        
+            // Add empty media placeholders to prompt the Jetson framework to push its GPU feed
+            pc.addTransceiver('video', { direction: 'recvonly' });
+        
+            // 3. Connect to the signaling socket endpoint over secure WebSockets
+            ws = new WebSocket(`wss://${NGROK_HOST}/webrtc`);
+        
+            ws.onopen = async () => {
+                console.log("Connected to Jetson signaling system. Negotiating stream channel...");
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                
+                // Send format proposal array directly to the jetson-inference backend container
+                ws.send(JSON.stringify({
+                    cmd: "request",
+                    stream: STREAM_NAME,
+                    sdp: pc.localDescription.sdp,
+                    type: pc.localDescription.type
+                }));
+            };
+        
             ws.onmessage = async (message) => {
                 const data = JSON.parse(message.data);
+                
                 if (data.sdp) {
-                    await pc.setRemoteDescription(new RTCSessionDescription(data));
-                    if (data.type === 'offer') {
-                        const answer = await pc.createAnswer();
-                        await pc.setLocalDescription(answer);
-                        ws.send(JSON.stringify(pc.localDescription));
-                    }
+                    console.log("Received video stream configurations. Rendering pipeline...");
+                    await pc.setRemoteDescription(new RTCSessionDescription({
+                        type: data.type,
+                        sdp: data.sdp
+                    }));
                 } else if (data.candidate) {
                     await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
                 }
             };
+        
+            ws.onerror = (error) => console.error("WebSocket Signaling Pipeline Error:", error);
+            ws.onclose = () => console.log("Signaling socket channel successfully closed.");
         }
-
-        // Start the link sequence automatically on page load
-        startWebRTC().catch(console.error);
+        
+        // Kickstart player routine automatically on page load sequence
+        window.onload = startWebRTC;
     </script>
 </body>
 </html>
