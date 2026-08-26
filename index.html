@@ -71,9 +71,7 @@
         
         function startWebRTC() {
             // 1. Initialize peer connection with standard web tracking servers
-            pc = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:://google.com' }]
-            });
+            pc = new RTCPeerConnection({});
         
             // 2. Bind video track handler
             pc.ontrack = (event) => {
