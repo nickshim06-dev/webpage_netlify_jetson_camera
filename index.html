@@ -83,7 +83,7 @@
             pc.addTransceiver('video', { direction: 'recvonly' });
         
             // 3. Connect to the signaling socket endpoint over secure WebSockets
-            ws = new WebSocket(`wss://${NGROK_HOST}/webrtc`);
+            ws = new WebSocket('wss://${NGROK_HOST}/');
         
             ws.onopen = async () => {
                 console.log("Connected to Jetson signaling system. Negotiating stream channel...");
