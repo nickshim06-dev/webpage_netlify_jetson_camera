@@ -31,8 +31,11 @@
             overflow: hidden;
             margin-top: 15px;
             aspect-ratio: 16 / 9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
-        video {
+        img {
             width: 100%;
             height: 100%;
             object-fit: contain;
@@ -51,71 +54,13 @@
 
     <div class="container">
         <h2>Jetson Nano CCTV Feed <span class="badge">LIVE</span></h2>
-        <p>AI Model: SSD-Mobilenet-v2 (Person Detection)</p>
+        <p>Lightweight Hardware Stream Engine</p>
         
         <div class="video-box">
-            <video id="jetson-video" autoplay muted playsinline controls></video>
+            <!-- REPLACED: Simple, high-performance image stream channel -->
+            <img src="https://charbroil-overtime-mothproof.ngrok-free.dev" alt="Live Jetson Camera Feed Stream">
         </div>
     </div>
 
-    <script>
-        const NGROK_HOST = "charbroil-overtime-mothproof.ngrok-free.dev";
-        const STREAM_NAME = "mystream"; 
-        
-        const videoElement = document.getElementById('jetson-video');
-        let pc = null;
-        let ws = null;
-        
-        function startWebRTC() {
-            pc = new RTCPeerConnection({});
-        
-            pc.ontrack = (event) => {
-                console.log("Receiving live video tracks from Jetson Nano...");
-                videoElement.srcObject = event.streams[0];
-            };
-        
-            pc.addTransceiver('video', { direction: 'recvonly' });
-        
-            // Replace your old ws = new WebSocket(...) line with this exact logic:
-            const protocol = "wss://";
-            const urlParams = "?ngrok-skip-browser-warning=true";
-            
-            ws = new WebSocket(protocol + NGROK_HOST + "/" + urlParams);
-
-        
-            ws.onopen = async () => {
-                console.log("Connected to Jetson signaling system. Negotiating stream channel...");
-                const offer = await pc.createOffer();
-                await pc.setLocalDescription(offer);
-                
-                // FIX: Field names matched to NVIDIA's jetson-inference expectation
-                ws.send(JSON.stringify({
-                    command: "request",
-                    stream_id: STREAM_NAME,
-                    sdp: pc.localDescription.sdp,
-                    type: pc.localDescription.type
-                }));
-            };
-        
-            ws.onmessage = async (message) => {
-                const data = JSON.parse(message.data);
-                
-                if (data.sdp) {
-                    console.log("Received video stream configurations. Rendering pipeline...");
-                    await pc.setRemoteDescription(new RTCSessionDescription({
-                        type: data.type,
-                        sdp: data.sdp
-                    }));
-                } else if (data.candidate) {
-                    await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-                }
-            };
-        
-            ws.onerror = (error) => console.error("WebSocket Signaling Pipeline Error:", error);
-            ws.onclose = () => console.log("Signaling socket channel successfully closed.");
-        }
-        
-        window.onload = startWebRTC;
-    </script>
 </body>
 </html>
